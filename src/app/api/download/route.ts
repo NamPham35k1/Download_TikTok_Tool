@@ -82,10 +82,9 @@ async function handleDownloadStream(
   }
 
   const responseHeaders = new Headers();
-  responseHeaders.set(
-    'Content-Type',
-    rawContentType || upstreamRes.headers.get('content-type') || 'application/octet-stream'
-  );
+  // Using application/octet-stream prevents iOS Safari from opening inline player
+  // and forces the native "Do you want to download?" prompt.
+  responseHeaders.set('Content-Type', 'application/octet-stream');
   responseHeaders.set('Content-Disposition', `attachment; filename="${safeFilename}"`);
 
   const contentLength = upstreamRes.headers.get('content-length');

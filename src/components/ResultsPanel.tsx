@@ -401,19 +401,26 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
         )}
 
         {/* Mobile Download Helper Note */}
-        <div className="mt-6 pt-5 border-t border-slate-800/80 flex items-start space-x-3 text-xs text-slate-400 bg-slate-900/40 p-3.5 rounded-xl">
-          <Smartphone className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <p className="font-semibold text-slate-300">💡 Hướng dẫn tải trên điện thoại (iPhone & Android):</p>
-            <p>
-              • <strong>iPhone (Safari):</strong> Bấm <strong>Tải Về</strong> ➔ Safari sẽ hiện thông báo &ldquo;Bạn có muốn tải về?&rdquo; ➔ Bấm <strong>Tải về</strong>. File được lưu vào app <strong>Tệp (Files)</strong>. Để lưu vào <strong>Album Ảnh (Photos)</strong>, bấm vào biểu tượng mũi tên hoặc bấm nút xem để chọn Chia sẻ ➔ <em>Lưu video</em>.
-            </p>
-            <p>
-              • <strong>Android (Chrome):</strong> Bấm <strong>Tải Về</strong>, file sẽ tự động tải vào thư mục <strong>Download</strong> của máy.
-            </p>
-            <p className="text-amber-300/80">
-              • <em>Lưu ý:</em> Nếu bạn đang mở link từ trong ứng dụng Zalo, Facebook hoặc TikTok, hãy nhấn vào dấu 3 chấm (⋮) ở góc màn hình và chọn <strong>&ldquo;Mở bằng trình duyệt&rdquo; (Safari / Chrome)</strong> để tải file không bị ứng dụng chặn.
-            </p>
+        <div className="mt-6 pt-5 border-t border-slate-800/80 flex items-start space-x-3 text-xs text-slate-400 bg-slate-900/60 p-4 rounded-xl border border-purple-500/20">
+          <Smartphone className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+          <div className="space-y-2">
+            <p className="font-bold text-sm text-purple-200">📱 Video tải về trên iPhone nằm ở đâu?</p>
+            <div className="space-y-1 text-slate-300">
+              <p>
+                <strong>1. Nếu bấm nút &ldquo;Tải Về&rdquo;:</strong> Safari sẽ hiện bảng hỏi &ldquo;Bạn có muốn tải về?&rdquo; ➔ Bấm <strong>Tải về</strong>.
+                File tải xong nằm trong ứng dụng <strong>Tệp (Files)</strong> ➔ thư mục <strong>Tải về (Downloads)</strong>.
+              </p>
+              <p>
+                <strong>2. Cách lưu thẳng vào Album Ảnh (Photos / Cuộn camera):</strong>
+              </p>
+              <ul className="list-disc list-inside pl-2 space-y-0.5 text-slate-300">
+                <li>Khi video mở xem (preview) hoặc xem trong app Tệp, hãy bấm biểu tượng <strong>Chia sẻ (hình ô vuông có mũi tên hướng lên ⬆️)</strong>.</li>
+                <li>Cuộn xuống và chọn dòng <strong>&ldquo;Lưu video&rdquo; (Save Video)</strong>. Video sẽ ngay lập tức xuất hiện trong Album Ảnh của iPhone!</li>
+              </ul>
+              <p className="pt-1 text-amber-300/90">
+                ⚠️ <em>Lưu ý:</em> Nếu bạn đang mở web từ trong Zalo hoặc Messenger, ứng dụng sẽ chặn tải về. Hãy bấm dấu 3 chấm <strong>(⋮)</strong> ở góc trên và chọn <strong>&ldquo;Mở bằng trình duyệt Safari&rdquo;</strong> để tải được nhé!
+              </p>
+            </div>
           </div>
         </div>
       </div>
