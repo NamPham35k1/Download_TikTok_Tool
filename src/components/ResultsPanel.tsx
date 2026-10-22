@@ -24,10 +24,11 @@ interface ResultsPanelProps {
 export function ResultsPanel({ media }: ResultsPanelProps) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [isZipping, setIsZipping] = useState(false);
+  const [sharingId, setSharingId] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
 
-  // Helper to trigger browser download from a Blob (used for ZIP archives)
+  // Helper to trigger browser download from a Blob
   const triggerBrowserBlobDownload = (blob: Blob, filename: string) => {
     const objectUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -42,6 +43,53 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
     setTimeout(() => {
       window.URL.revokeObjectURL(objectUrl);
     }, 60000);
+  };
+
+  // Smart download handler supporting Web Share API Level 2 (Directly saves to iPhone Photos app)
+  const handleSaveToDevice = async (variantUrl: string, filename: string, trackId: string) => {
+    try {
+      setSharingId(trackId);
+      setDownloadError(null);
+
+      // Fetch the video through our proxy
+      const downloadProxyUrl = `/api/download?url=${encodeURIComponent(variantUrl)}&filename=${encodeURIComponent(filename)}&contentType=video/mp4`;
+      const res = await fetch(downloadProxyUrl);
+      if (!res.ok) {
+        throw new Error(`Tải dữ liệu thất bại (HTTP ${res.status})`);
+      }
+
+      const blob = await res.blob();
+      const file = new File([blob], filename, { type: 'video/mp4' });
+
+      // If mobile supports Web Share API with files (iOS Safari)
+      if (
+        typeof navigator !== 'undefined' &&
+        navigator.share &&
+        navigator.canShare &&
+        navigator.canShare({ files: [file] })
+      ) {
+        await navigator.share({
+          files: [file],
+          title: 'Nam IT TikTok Video',
+        });
+        return;
+      }
+
+      // Otherwise fallback to Blob download
+      triggerBrowserBlobDownload(blob, filename);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        // User closed the share sheet
+        return;
+      }
+      // If error or cancelled, fallback to direct download link
+      window.open(
+        `/api/download?url=${encodeURIComponent(variantUrl)}&filename=${encodeURIComponent(filename)}`,
+        '_blank'
+      );
+    } finally {
+      setSharingId(null);
+    }
   };
 
   // Download all slideshow photos as a single ZIP archive through /api/download-zip
@@ -213,6 +261,8 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
                   <a
                     href={`/api/download?url=${encodeURIComponent(media.music.playUrl)}&filename=${encodeURIComponent(`namit-tiktok-${media.id}-audio.mp3`)}&contentType=audio/mpeg`}
                     download={`namit-tiktok-${media.id}-audio.mp3`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition flex-shrink-0 cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5 text-cyan-400" />
@@ -233,17 +283,17 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
               {!isSlideshow && media.videoVariants.length > 0 && (
                 <div className="space-y-3">
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Các Định Dạng Video Có Thể Tải (Hỗ trợ cả Điện thoại & Máy tính)
+                    Các Định Dạng Video Có Thể Tải (Hỗ trợ iPhone & Android)
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {media.videoVariants.map((variant) => {
                       const isNoWatermark = !variant.hasWatermark;
                       const isHd = variant.id.includes('hd');
+                      const isThisSharing = sharingId === variant.id;
+                      const safeFilename = `namit-tiktok-${media.id}-${variant.id}.mp4`;
                       const directDownloadUrl = `/api/download?url=${encodeURIComponent(
                         variant.downloadUrl
-                      )}&filename=${encodeURIComponent(
-                        `namit-tiktok-${media.id}-${variant.id}.mp4`
-                      )}&contentType=video/mp4`;
+                      )}&filename=${encodeURIComponent(safeFilename)}&contentType=video/mp4`;
 
                       return (
                         <div
@@ -271,24 +321,37 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
                           </div>
 
                           <div className="flex items-center space-x-1.5 flex-shrink-0">
-                            {/* Direct native download link for PC & Mobile Safari / Chrome */}
+                            {/* Primary Action Button: Web Share API for iPhone (Lưu vào Album Ảnh) / Download */}
+                            <button
+                              type="button"
+                              disabled={sharingId !== null}
+                              onClick={() =>
+                                handleSaveToDevice(variant.downloadUrl, safeFilename, variant.id)
+                              }
+                              className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs shadow transition cursor-pointer active:scale-95 disabled:opacity-60"
+                              title="Tải về máy hoặc Lưu vào Album Ảnh"
+                            >
+                              {isThisSharing ? (
+                                <>
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  <span>Đang tải...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Tải Về</span>
+                                </>
+                              )}
+                            </button>
+
+                            {/* Direct link as fallback */}
                             <a
                               href={directDownloadUrl}
-                              download={`namit-tiktok-${media.id}-${variant.id}.mp4`}
-                              className="inline-flex items-center space-x-1 px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium text-xs shadow transition cursor-pointer active:scale-95"
-                              title="Tải video về máy"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                              <span>Tải Về</span>
-                            </a>
-
-                            {/* View in new tab (convenient for iOS users to Save to Photos) */}
-                            <a
-                              href={variant.downloadUrl}
+                              download={safeFilename}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
-                              title="Mở xem video trong tab mới"
+                              title="Tải file trực tiếp (.mp4)"
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
                             </a>
@@ -379,7 +442,7 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
                       #{photo.index}
                     </div>
 
-                    {/* Download Single Photo Button (Native direct download) */}
+                    {/* Download Single Photo Button */}
                     <div className="p-2 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between">
                       <span className="text-[11px] text-slate-400 font-mono truncate">
                         {photo.filename}
@@ -387,6 +450,8 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
                       <a
                         href={photoDownloadUrl}
                         download={`namit-${photo.filename}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="p-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition cursor-pointer"
                         title="Tải ảnh này về máy"
                       >
@@ -404,21 +469,16 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
         <div className="mt-6 pt-5 border-t border-slate-800/80 flex items-start space-x-3 text-xs text-slate-400 bg-slate-900/60 p-4 rounded-xl border border-purple-500/20">
           <Smartphone className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
           <div className="space-y-2">
-            <p className="font-bold text-sm text-purple-200">📱 Video tải về trên iPhone nằm ở đâu?</p>
-            <div className="space-y-1 text-slate-300">
+            <p className="font-bold text-sm text-purple-200">📱 Hướng dẫn tải video về máy trên iPhone:</p>
+            <div className="space-y-1.5 text-slate-300">
               <p>
-                <strong>1. Nếu bấm nút &ldquo;Tải Về&rdquo;:</strong> Safari sẽ hiện bảng hỏi &ldquo;Bạn có muốn tải về?&rdquo; ➔ Bấm <strong>Tải về</strong>.
-                File tải xong nằm trong ứng dụng <strong>Tệp (Files)</strong> ➔ thư mục <strong>Tải về (Downloads)</strong>.
+                <strong>Cách 1 (Lưu thẳng vào Album Ảnh):</strong> Bấm nút <strong>Tải Về</strong> màu tím ➔ Đợi 1–2 giây để tải dữ liệu ➔ Màn hình iPhone sẽ tự động bật bảng Chia sẻ ➔ Chọn dòng <strong>&ldquo;Lưu video&rdquo; (Save Video)</strong>. Video sẽ ngay lập tức xuất hiện trong <strong>Album Ảnh (Photos)</strong>!
               </p>
               <p>
-                <strong>2. Cách lưu thẳng vào Album Ảnh (Photos / Cuộn camera):</strong>
+                <strong>Cách 2 (Tải file vào ứng dụng Tệp):</strong> Bấm vào biểu tượng ô vuông mũi tên <strong>(↗️)</strong> bên cạnh ➔ Safari sẽ hỏi &ldquo;Bạn có muốn tải về?&rdquo; ➔ Bấm <strong>Tải về</strong>. File sẽ nằm trong ứng dụng <strong>Tệp (Files) ➔ Tải về</strong>.
               </p>
-              <ul className="list-disc list-inside pl-2 space-y-0.5 text-slate-300">
-                <li>Khi video mở xem (preview) hoặc xem trong app Tệp, hãy bấm biểu tượng <strong>Chia sẻ (hình ô vuông có mũi tên hướng lên ⬆️)</strong>.</li>
-                <li>Cuộn xuống và chọn dòng <strong>&ldquo;Lưu video&rdquo; (Save Video)</strong>. Video sẽ ngay lập tức xuất hiện trong Album Ảnh của iPhone!</li>
-              </ul>
               <p className="pt-1 text-amber-300/90">
-                ⚠️ <em>Lưu ý:</em> Nếu bạn đang mở web từ trong Zalo hoặc Messenger, ứng dụng sẽ chặn tải về. Hãy bấm dấu 3 chấm <strong>(⋮)</strong> ở góc trên và chọn <strong>&ldquo;Mở bằng trình duyệt Safari&rdquo;</strong> để tải được nhé!
+                ⚠️ <em>Lưu ý:</em> Nếu bạn đang mở link từ trong ứng dụng Zalo, Messenger hoặc Facebook, hãy bấm dấu 3 chấm <strong>(⋮)</strong> ở góc trên và chọn <strong>&ldquo;Mở bằng Safari&rdquo;</strong> để tránh bị ứng dụng chặn tải nhé!
               </p>
             </div>
           </div>
@@ -437,10 +497,7 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
             const url = `/api/download?url=${encodeURIComponent(
               photo.imageUrl
             )}&filename=${encodeURIComponent(`namit-${photo.filename}`)}&contentType=image/jpeg`;
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `namit-${photo.filename}`;
-            link.click();
+            window.open(url, '_blank');
           }}
         />
       )}
