@@ -7,6 +7,7 @@ import { zipRateLimiter } from '@/lib/security/rate-limiter';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 const MAX_TOTAL_BYTES = 150 * 1024 * 1024; // 150 MB safety cap
 const MAX_ITEM_BYTES = 25 * 1024 * 1024; // 25 MB per image cap
