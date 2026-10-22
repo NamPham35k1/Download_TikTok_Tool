@@ -11,6 +11,8 @@ import {
   AlertTriangle,
   Sparkles,
   Maximize2,
+  Smartphone,
+  ExternalLink,
 } from 'lucide-react';
 import { NormalizedMediaResult } from '@/lib/providers/types';
 import { PhotoLightboxModal } from './PhotoLightboxModal';
@@ -20,57 +22,26 @@ interface ResultsPanelProps {
 }
 
 export function ResultsPanel({ media }: ResultsPanelProps) {
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [isZipping, setIsZipping] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
 
-  // Helper to trigger browser download from a Blob
+  // Helper to trigger browser download from a Blob (used for ZIP archives)
   const triggerBrowserBlobDownload = (blob: Blob, filename: string) => {
     const objectUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = objectUrl;
     link.download = filename;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    window.URL.revokeObjectURL(objectUrl);
-  };
-
-  // Download a single video variant or audio stream through /api/download
-  const handleDownloadSingle = async (
-    targetUrl: string,
-    filename: string,
-    contentType: 'video/mp4' | 'audio/mpeg' | 'image/jpeg',
-    trackId: string
-  ) => {
-    try {
-      setDownloadingId(trackId);
-      setDownloadError(null);
-
-      const res = await fetch('/api/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: targetUrl,
-          filename,
-          contentType,
-        }),
-      });
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        throw new Error(errJson?.error?.message || `Tải thất bại với mã lỗi HTTP ${res.status}`);
-      }
-
-      const blob = await res.blob();
-      triggerBrowserBlobDownload(blob, filename);
-    } catch (err: unknown) {
-      setDownloadError(err instanceof Error ? err.message : 'Không thể tải file về máy.');
-    } finally {
-      setDownloadingId(null);
-    }
+    // Keep URL alive for 60 seconds so mobile download managers can finish reading
+    setTimeout(() => {
+      window.URL.revokeObjectURL(objectUrl);
+    }, 60000);
   };
 
   // Download all slideshow photos as a single ZIP archive through /api/download-zip
@@ -239,26 +210,14 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
                       )}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    disabled={downloadingId === 'audio'}
-                    onClick={() =>
-                      handleDownloadSingle(
-                        media.music!.playUrl!,
-                        `namit-tiktok-${media.id}-audio.mp3`,
-                        'audio/mpeg',
-                        'audio'
-                      )
-                    }
-                    className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition flex-shrink-0"
+                  <a
+                    href={`/api/download?url=${encodeURIComponent(media.music.playUrl)}&filename=${encodeURIComponent(`namit-tiktok-${media.id}-audio.mp3`)}&contentType=audio/mpeg`}
+                    download={`namit-tiktok-${media.id}-audio.mp3`}
+                    className="inline-flex items-center space-x-1 px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition flex-shrink-0 cursor-pointer"
                   >
-                    {downloadingId === 'audio' ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
-                    ) : (
-                      <Download className="w-3.5 h-3.5 text-cyan-400" />
-                    )}
+                    <Download className="w-3.5 h-3.5 text-cyan-400" />
                     <span>Tải Nhạc MP3</span>
-                  </button>
+                  </a>
                 </div>
               )}
 
@@ -274,30 +233,24 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
               {!isSlideshow && media.videoVariants.length > 0 && (
                 <div className="space-y-3">
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    Các Định Dạng Video Có Thể Tải
+                    Các Định Dạng Video Có Thể Tải (Hỗ trợ cả Điện thoại & Máy tính)
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {media.videoVariants.map((variant) => {
-                      const isTarget = downloadingId === variant.id;
                       const isNoWatermark = !variant.hasWatermark;
                       const isHd = variant.id.includes('hd');
+                      const directDownloadUrl = `/api/download?url=${encodeURIComponent(
+                        variant.downloadUrl
+                      )}&filename=${encodeURIComponent(
+                        `namit-tiktok-${media.id}-${variant.id}.mp4`
+                      )}&contentType=video/mp4`;
 
                       return (
-                        <button
+                        <div
                           key={variant.id}
-                          type="button"
-                          disabled={downloadingId !== null}
-                          onClick={() =>
-                            handleDownloadSingle(
-                              variant.downloadUrl,
-                              `namit-tiktok-${media.id}-${variant.id}.mp4`,
-                              'video/mp4',
-                              variant.id
-                            )
-                          }
-                          className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition duration-200 cursor-pointer ${
+                          className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition duration-200 ${
                             isNoWatermark
-                              ? 'bg-gradient-to-r from-purple-950/40 to-slate-900 border-purple-500/40 hover:border-purple-400 hover:bg-purple-900/30'
+                              ? 'bg-gradient-to-r from-purple-950/40 to-slate-900 border-purple-500/40 hover:border-purple-400'
                               : 'bg-slate-900 border-slate-800 hover:border-slate-700'
                           }`}
                         >
@@ -316,14 +269,31 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
                               {isNoWatermark ? 'Bản sạch không logo (Nam IT)' : 'Bản gốc có logo TikTok'}
                             </p>
                           </div>
-                          <div className="flex-shrink-0">
-                            {isTarget ? (
-                              <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
-                            ) : (
-                              <Download className="w-5 h-5 text-indigo-400" />
-                            )}
+
+                          <div className="flex items-center space-x-1.5 flex-shrink-0">
+                            {/* Direct native download link for PC & Mobile Safari / Chrome */}
+                            <a
+                              href={directDownloadUrl}
+                              download={`namit-tiktok-${media.id}-${variant.id}.mp4`}
+                              className="inline-flex items-center space-x-1 px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium text-xs shadow transition cursor-pointer active:scale-95"
+                              title="Tải video về máy"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Tải Về</span>
+                            </a>
+
+                            {/* View in new tab (convenient for iOS users to Save to Photos) */}
+                            <a
+                              href={variant.downloadUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
+                              title="Mở xem video trong tab mới"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
                           </div>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -339,7 +309,7 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
                         Album Ảnh Slideshow ({media.photos.length} Bức Ảnh) • Nam IT
                       </p>
                       <p className="text-xs text-slate-400">
-                        Bạn có thể tải từng ảnh riêng lẻ phía dưới hoặc tải toàn bộ album được nén thành 1 file ZIP.
+                        Bạn có thể bấm tải từng ảnh riêng lẻ phía dưới hoặc tải toàn bộ album được nén thành 1 file ZIP.
                       </p>
                     </div>
                   </div>
@@ -378,7 +348,9 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
               {media.photos.map((photo, index) => {
-                const isPhotoDownloading = downloadingId === `photo-${photo.index}`;
+                const photoDownloadUrl = `/api/download?url=${encodeURIComponent(
+                  photo.imageUrl
+                )}&filename=${encodeURIComponent(`namit-${photo.filename}`)}&contentType=image/jpeg`;
 
                 return (
                   <div
@@ -407,31 +379,19 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
                       #{photo.index}
                     </div>
 
-                    {/* Download Single Photo Button */}
+                    {/* Download Single Photo Button (Native direct download) */}
                     <div className="p-2 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between">
                       <span className="text-[11px] text-slate-400 font-mono truncate">
                         {photo.filename}
                       </span>
-                      <button
-                        type="button"
-                        disabled={isPhotoDownloading}
-                        onClick={() =>
-                          handleDownloadSingle(
-                            photo.imageUrl,
-                            `namit-${photo.filename}`,
-                            'image/jpeg',
-                            `photo-${photo.index}`
-                          )
-                        }
-                        className="p-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition disabled:opacity-50"
+                      <a
+                        href={photoDownloadUrl}
+                        download={`namit-${photo.filename}`}
+                        className="p-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition cursor-pointer"
                         title="Tải ảnh này về máy"
                       >
-                        {isPhotoDownloading ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Download className="w-3.5 h-3.5" />
-                        )}
-                      </button>
+                        <Download className="w-3.5 h-3.5" />
+                      </a>
                     </div>
                   </div>
                 );
@@ -439,6 +399,23 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
             </div>
           </div>
         )}
+
+        {/* Mobile Download Helper Note */}
+        <div className="mt-6 pt-5 border-t border-slate-800/80 flex items-start space-x-3 text-xs text-slate-400 bg-slate-900/40 p-3.5 rounded-xl">
+          <Smartphone className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-semibold text-slate-300">💡 Hướng dẫn tải trên điện thoại (iPhone & Android):</p>
+            <p>
+              • <strong>iPhone (Safari):</strong> Bấm <strong>Tải Về</strong> ➔ Safari sẽ hiện thông báo &ldquo;Bạn có muốn tải về?&rdquo; ➔ Bấm <strong>Tải về</strong>. File được lưu vào app <strong>Tệp (Files)</strong>. Để lưu vào <strong>Album Ảnh (Photos)</strong>, bấm vào biểu tượng mũi tên hoặc bấm nút xem để chọn Chia sẻ ➔ <em>Lưu video</em>.
+            </p>
+            <p>
+              • <strong>Android (Chrome):</strong> Bấm <strong>Tải Về</strong>, file sẽ tự động tải vào thư mục <strong>Download</strong> của máy.
+            </p>
+            <p className="text-amber-300/80">
+              • <em>Lưu ý:</em> Nếu bạn đang mở link từ trong ứng dụng Zalo, Facebook hoặc TikTok, hãy nhấn vào dấu 3 chấm (⋮) ở góc màn hình và chọn <strong>&ldquo;Mở bằng trình duyệt&rdquo; (Safari / Chrome)</strong> để tải file không bị ứng dụng chặn.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Lightbox Modal */}
@@ -449,14 +426,15 @@ export function ResultsPanel({ media }: ResultsPanelProps) {
           isOpen={lightboxOpen}
           onClose={() => setLightboxOpen(false)}
           onSelectIndex={(idx) => setSelectedPhotoIndex(idx)}
-          onDownloadPhoto={(photo) =>
-            handleDownloadSingle(
-              photo.imageUrl,
-              `namit-${photo.filename}`,
-              'image/jpeg',
-              `photo-${photo.index}`
-            )
-          }
+          onDownloadPhoto={(photo) => {
+            const url = `/api/download?url=${encodeURIComponent(
+              photo.imageUrl
+            )}&filename=${encodeURIComponent(`namit-${photo.filename}`)}&contentType=image/jpeg`;
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `namit-${photo.filename}`;
+            link.click();
+          }}
         />
       )}
     </div>
